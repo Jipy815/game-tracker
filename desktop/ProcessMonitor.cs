@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.IO;
 
 namespace GamePresenceDesktop
 {
@@ -49,18 +51,40 @@ namespace GamePresenceDesktop
         private string _currentExe = null;
         private DateTime? _startedAt = null;
 
-        // Replace these with your Supabase project settings
-        private readonly string _supabaseUrl = "https://your-project.supabase.co";
-        private readonly string _supabaseAnonKey = "PUBLIC_ANON_KEY_OR_USER_JWT"; // Prefer storing user JWT after auth
+        // Supabase settings (can be provided in config file at %APPDATA%/GamePresence/config.json)
+        private readonly string _supabaseUrl;
+        private SupabaseAuth _auth;
 
         public event Action<string> OnStatusChanged;
 
         public ProcessMonitor()
         {
             _http = new HttpClient();
-            _http.DefaultRequestHeaders.Add("apikey", _supabaseAnonKey);
-            _http.DefaultRequestHeaders.Add("Authorization", $"Bearer {_supabaseAnonKey}");
 
+            // Load config if present
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var cfgPath = Path.Combine(appData, "GamePresence", "config.json");
+            if (File.Exists(cfgPath))
+            {
+                try
+                {
+                    var cfg = JsonDocument.Parse(File.ReadAllText(cfgPath)).RootElement;
+                    _supabaseUrl = cfg.GetProperty("supabase_url").GetString();
+                    var email = cfg.GetProperty("email").GetString();
+                    var password = cfg.GetProperty("password").GetString();
+                    _auth = new SupabaseAuth(_supabaseUrl);
+                    // Attempt sign-in (if token exists this is quick)
+                    _auth.SignInAsync(email, password).Wait();
+                }
+                catch
+                {
+                    _supabaseUrl = "https://your-project.supabase.co";
+                }
+            }
+            else
+            {
+                _supabaseUrl = "https://your-project.supabase.co";
+            }
             _whitelist = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 {"dota2.exe","Dota 2"},
@@ -70,6 +94,44 @@ namespace GamePresenceDesktop
             };
 
             _timer = new Timer(CheckProcesses, null, Timeout.Infinite, Timeout.Infinite);
+        }
+
+        public bool IsAuthenticated => _auth != null;
+
+        public async Task<bool> SignInAsync(string email, string password)
+        {
+            try
+            {
+                _auth = new SupabaseAuth(_supabaseUrl);
+                var ok = await _auth.SignInAsync(email, password);
+                if (!ok)
+                {
+                    _auth = null;
+                    return false;
+                }
+                // Persist credentials (for convenience) - encrypted token file stored by SupabaseAuth
+                SaveCredentials(email, password);
+                return true;
+            }
+            catch
+            {
+                _auth = null;
+                return false;
+            }
+        }
+
+        public void SaveCredentials(string email, string password)
+        {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var dir = Path.Combine(appData, "GamePresence");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                var cfgPath = Path.Combine(dir, "config.json");
+                var cfg = JsonSerializer.Serialize(new { supabase_url = _supabaseUrl, email = email, password = password });
+                File.WriteAllText(cfgPath, cfg);
+            }
+            catch { }
         }
 
         public void Start()
