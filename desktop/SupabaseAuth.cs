@@ -29,6 +29,7 @@ namespace GamePresenceDesktop
 
         public bool HasStoredSession => _token != null && !string.IsNullOrWhiteSpace(_token.RefreshToken);
         public string UserId => _token?.UserId;
+        public string UserEmail => _token?.UserEmail ?? GetEmail(_token?.AccessToken);
 
         public async Task<bool> RestoreSessionAsync()
         {
@@ -141,6 +142,9 @@ namespace GamePresenceDesktop
                 AccessToken = root.GetProperty("access_token").GetString(),
                 RefreshToken = root.GetProperty("refresh_token").GetString(),
                 UserId = userId,
+                UserEmail = root.TryGetProperty("user", out var responseUser) && responseUser.TryGetProperty("email", out var email)
+                    ? email.GetString()
+                    : GetEmail(root.GetProperty("access_token").GetString()),
                 ExpiresAt = DateTime.UtcNow.AddSeconds(Math.Max(0, root.GetProperty("expires_in").GetInt32() - 30))
             };
             SaveToken();
@@ -173,6 +177,27 @@ namespace GamePresenceDesktop
                 return null;
             }
         }
+
+        private static string GetEmail(string accessToken)
+        {
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                return null;
+            }
+
+            try
+            {
+                var segment = accessToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
+                segment = segment.PadRight(segment.Length + (4 - segment.Length % 4) % 4, '=');
+                using var document = JsonDocument.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(segment)));
+                return document.RootElement.TryGetProperty("email", out var email) ? email.GetString() : null;
+            }
+            catch (FormatException) { return null; }
+            catch (IndexOutOfRangeException) { return null; }
+            catch (JsonException) { return null; }
+        }
+
+        public void SignOut() => ClearToken();
 
         private void SaveToken()
         {
@@ -233,6 +258,7 @@ namespace GamePresenceDesktop
             public string AccessToken { get; set; }
             public string RefreshToken { get; set; }
             public string UserId { get; set; }
+            public string UserEmail { get; set; }
             public DateTime ExpiresAt { get; set; }
         }
     }

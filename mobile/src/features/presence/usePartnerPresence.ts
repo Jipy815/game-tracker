@@ -1,27 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { disconnectPartner } from "../connection/connectionApi";
 import { registerDeviceForNotifications } from "../notifications/registerDevice";
-import { partnerSelection } from "../../shared/storage/partnerSelection";
-import { getLinkedPartner, getPresence, subscribeToPresence } from "./presenceApi";
-import type { PartnerProfile, Presence } from "./types";
 import { getSupabaseClient } from "../../config/supabase";
+import { getLinkedPartner, getPresence, getRecentSessions, subscribeToPresence } from "./presenceApi";
+import type { GameSession, PartnerProfile, Presence } from "./types";
 
 type PartnerPresenceState = {
   partner: PartnerProfile | null;
-  selectedPartnerId: string | null;
   presence: Presence | null;
+  sessions: GameSession[];
   loading: boolean;
   message: string | null;
   refresh: () => Promise<void>;
-  selectPartner: () => Promise<void>;
-  changePartner: () => Promise<void>;
+  disconnect: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 export function usePartnerPresence(session: Session): PartnerPresenceState {
   const [partner, setPartner] = useState<PartnerProfile | null>(null);
-  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [presence, setPresence] = useState<Presence | null>(null);
+  const [sessions, setSessions] = useState<GameSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -32,17 +31,22 @@ export function usePartnerPresence(session: Session): PartnerPresenceState {
       const linkedPartner = await getLinkedPartner(session.user.id);
       setPartner(linkedPartner);
       if (!linkedPartner) {
-        setSelectedPartnerId(null);
-        setMessage("No partner is linked to this account yet.");
+        setPresence(null);
+        setSessions([]);
         return;
       }
 
-      const savedPartnerId = await partnerSelection.get(session.user.id);
-      setSelectedPartnerId(savedPartnerId === linkedPartner.id ? savedPartnerId : null);
+      const [nextPresence, recentSessions] = await Promise.all([
+        getPresence(linkedPartner.id),
+        getRecentSessions(linkedPartner.id),
+      ]);
+      setPresence(nextPresence);
+      setSessions(recentSessions);
     } catch {
       setPartner(null);
-      setSelectedPartnerId(null);
-      setMessage("Your linked partner could not be loaded.");
+      setPresence(null);
+      setSessions([]);
+      setMessage("Your partner information could not be loaded. Pull to refresh and try again.");
     } finally {
       setLoading(false);
     }
@@ -50,63 +54,36 @@ export function usePartnerPresence(session: Session): PartnerPresenceState {
 
   useEffect(() => {
     void refresh();
-    void registerDeviceForNotifications(session).then((registrationMessage) => {
-      if (registrationMessage) setMessage(registrationMessage);
-    }).catch(() => setMessage("Unable to register this device for notifications."));
+    void registerDeviceForNotifications(session)
+      .then((registrationMessage) => { if (registrationMessage) setMessage(registrationMessage); })
+      .catch(() => setMessage("Unable to register this device for notifications."));
   }, [refresh, session]);
 
   useEffect(() => {
-    if (!selectedPartnerId) {
-      setPresence(null);
-      return;
-    }
-
+    if (!partner) return;
     let active = true;
-    void getPresence(selectedPartnerId).then((nextPresence) => {
-      if (active) setPresence(nextPresence);
-    }).catch(() => {
-      if (active) setMessage("Unable to load partner presence.");
-    });
-
     const unsubscribe = subscribeToPresence(
-      selectedPartnerId,
-      (nextPresence) => { if (active) setPresence(nextPresence); },
-      () => { if (active) setMessage("Realtime connection failed; the app will retry automatically."); },
+      partner.id,
+      (nextPresence) => {
+        if (active) setPresence(nextPresence);
+      },
+      () => { if (active) setMessage("Live updates are reconnecting. Your last known status is still shown."); },
     );
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [selectedPartnerId]);
+  }, [partner]);
 
-  const selectPartner = useCallback(async () => {
-    if (!partner) return;
-    try {
-      await partnerSelection.save(session.user.id, partner.id);
-      setSelectedPartnerId(partner.id);
-    } catch {
-      setMessage("Unable to save your partner selection.");
-    }
-  }, [partner, session.user.id]);
-
-  const changePartner = useCallback(async () => {
-    try {
-      await partnerSelection.clear(session.user.id);
-      setSelectedPartnerId(null);
-    } catch {
-      setMessage("Unable to clear your partner selection.");
-    }
-  }, [session.user.id]);
+  const disconnect = useCallback(async () => {
+    await disconnectPartner();
+    await refresh();
+  }, [refresh]);
 
   const signOut = useCallback(async () => {
-    try {
-      await partnerSelection.clear(session.user.id);
-      const { error } = await getSupabaseClient().auth.signOut();
-      if (error) throw error;
-    } catch {
-      setMessage("Unable to sign out. Please try again.");
-    }
-  }, [session.user.id]);
+    const { error } = await getSupabaseClient().auth.signOut();
+    if (error) throw error;
+  }, []);
 
-  return { partner, selectedPartnerId, presence, loading, message, refresh, selectPartner, changePartner, signOut };
+  return { partner, presence, sessions, loading, message, refresh, disconnect, signOut };
 }

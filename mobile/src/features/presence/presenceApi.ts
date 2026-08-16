@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "../../config/supabase";
-import type { PartnerProfile, Presence } from "./types";
+import type { GameSession, PartnerProfile, Presence } from "./types";
 
 export async function getLinkedPartner(userId: string): Promise<PartnerProfile | null> {
   const client = getSupabaseClient();
@@ -25,12 +25,24 @@ export async function getLinkedPartner(userId: string): Promise<PartnerProfile |
 export async function getPresence(partnerId: string): Promise<Presence | null> {
   const { data, error } = await getSupabaseClient()
     .from("presence")
-    .select("status, current_game, started_at")
+    .select("status, current_game, current_executable, started_at, updated_at")
     .eq("user_id", partnerId)
     .maybeSingle();
 
   if (error) throw error;
   return data as Presence | null;
+}
+
+export async function getRecentSessions(partnerId: string): Promise<GameSession[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("game_sessions")
+    .select("id, game_name, executable_name, start_time, end_time, duration")
+    .eq("user_id", partnerId)
+    .order("start_time", { ascending: false })
+    .limit(5);
+
+  if (error) throw error;
+  return (data ?? []) as GameSession[];
 }
 
 export function subscribeToPresence(
