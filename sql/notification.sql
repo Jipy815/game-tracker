@@ -82,8 +82,7 @@ begin
   with ready as (
     select id
     from public.notification_queue
-    where status = 'pending'
-       or (status = 'failed' and attempts < 5)
+    where (status = 'pending' or (status = 'failed' and attempts < 5))
       and next_attempt_at <= now()
     order by created_at
     for update skip locked

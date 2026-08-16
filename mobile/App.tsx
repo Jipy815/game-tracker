@@ -1,30 +1,11 @@
-import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import type { Session } from "@supabase/supabase-js";
-import LoginScreen from "./screens/LoginScreen";
-import PresenceScreen from "./screens/PresenceScreen";
-import { isSupabaseConfigured, supabase } from "./src/supabase";
+import LoginScreen from "./src/features/auth/LoginScreen";
+import { useAuthSession } from "./src/features/auth/useAuthSession";
+import PresenceScreen from "./src/features/presence/PresenceScreen";
+import { isSupabaseConfigured } from "./src/config/supabase";
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setLoading(false);
-    });
-    return () => subscription.subscription.unsubscribe();
-  }, []);
+  const { session, loading } = useAuthSession();
 
   if (!isSupabaseConfigured) {
     return (

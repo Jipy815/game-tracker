@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Button, StyleSheet, Text, TextInput, View } from "react-native";
-import { getSupabaseClient } from "../src/supabase";
+import { signInWithPassword } from "./authApi";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -17,15 +17,9 @@ export default function LoginScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const { error: signInError } = await getSupabaseClient().auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (signInError) {
-        setError(signInError.message);
-      }
+      await signInWithPassword(email.trim(), password);
     } catch {
-      setError("Unable to sign in. Check your connection and Supabase configuration.");
+      setError("Unable to sign in. Check your credentials, connection, and Supabase configuration.");
     } finally {
       setSubmitting(false);
     }
@@ -34,7 +28,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Game Presence</Text>
-      <Text style={styles.subtitle}>Sign in to view your linked partner’s game activity.</Text>
+      <Text style={styles.subtitle}>Sign in to view your linked partner's game activity.</Text>
       <TextInput
         autoCapitalize="none"
         autoComplete="email"
@@ -53,7 +47,7 @@ export default function LoginScreen() {
         onChangeText={setPassword}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {submitting ? <ActivityIndicator /> : <Button title="Sign in" onPress={signIn} />}
+      {submitting ? <ActivityIndicator /> : <Button title="Sign in" onPress={() => void signIn()} />}
     </View>
   );
 }

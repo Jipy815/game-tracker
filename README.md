@@ -2,6 +2,8 @@
 
 Game Presence Tracker records games detected by a Windows tray application, stores presence and session history in Supabase, and lets a linked partner view live presence in an Expo mobile app. Presence changes are queued in PostgreSQL and delivered to registered Expo devices by a Supabase Edge Function.
 
+The repository follows a feature-first mobile architecture and database-enforced trust boundaries. See [ARCHITECTURE.md](ARCHITECTURE.md) for ownership boundaries, invariants, and the end-to-end flow.
+
 ```mermaid
 flowchart LR
   Desktop[Windows desktop tracker] -->|authenticated REST| Supabase[Supabase: Auth, Postgres, Realtime]
@@ -112,6 +114,10 @@ cd desktop; dotnet restore; dotnet build -c Release
 
 # Mobile
 cd mobile; npm install; npm run typecheck; npm run doctor
+
+# Or, from the repository root after bootstrap
+npm run check
+npm run mobile:doctor
 
 # Repository
 git status

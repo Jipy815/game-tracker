@@ -1,0 +1,20 @@
+{
+  "name": "game-tracker-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "mobile",
+    "desktop",
+    "supabase",
+    "packages/*"
+  ],
+  "scripts": {
+    "bootstrap": "npm install",
+    "mobile:start": "npm run start --workspace=game-presence-mobile",
+    "mobile:doctor": "npm run doctor --workspace=game-presence-mobile",
+    "mobile:typecheck": "npm run typecheck --workspace=game-presence-mobile",
+    "typecheck": "npm run mobile:typecheck",
+    "check": "npm run typecheck",
+    "build": "node -e \"console.log('Build the mobile app with EAS and the desktop app with dotnet build.')\""
+  }
+}
