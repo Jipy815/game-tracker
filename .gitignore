@@ -1,2 +1,14 @@
-/README.md
-/.env
+# Local editor and build output
+*.code-workspace
+bin/
+obj/
+
+# JavaScript / Expo output
+node_modules/
+.expo/
+dist/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example

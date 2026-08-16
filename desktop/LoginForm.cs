@@ -31,10 +31,12 @@ namespace GamePresenceDesktop
             var lblPass = new Label { Left = 12, Top = 70, Text = "Password", Width = 300 };
             _passwordBox = new TextBox { Left = 12, Top = 90, Width = 320, UseSystemPasswordChar = true };
 
-            _loginBtn = new Button { Text = "Sign in", Left = 160, Width = 80, Top = 130, DialogResult = DialogResult.OK };
+            _loginBtn = new Button { Text = "Sign in", Left = 160, Width = 80, Top = 130 };
             _cancelBtn = new Button { Text = "Cancel", Left = 250, Width = 80, Top = 130, DialogResult = DialogResult.Cancel };
 
             _loginBtn.Click += async (s, e) => await OnLoginClicked();
+            this.AcceptButton = _loginBtn;
+            this.CancelButton = _cancelBtn;
 
             this.Controls.Add(lblEmail);
             this.Controls.Add(_emailBox);

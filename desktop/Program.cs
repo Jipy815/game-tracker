@@ -14,8 +14,18 @@ namespace GamePresenceDesktop
 
             var monitor = new ProcessMonitor();
 
-            // If not authenticated, show login dialog first
-            if (!monitor.IsAuthenticated)
+            if (!monitor.IsConfigured)
+            {
+                MessageBox.Show(
+                    "Create %APPDATA%\\GamePresence\\config.json from desktop\\config.example.json before signing in.",
+                    "Game Presence configuration",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // Restore the encrypted refresh-token session before prompting for credentials.
+            if (!monitor.RestoreSessionAsync().GetAwaiter().GetResult())
             {
                 using (var login = new LoginForm(monitor))
                 {
@@ -28,10 +38,17 @@ namespace GamePresenceDesktop
                 }
             }
 
-            var trayApp = new TrayApplication(monitor);
-            monitor.Start();
-            Application.Run();
-            monitor.Stop();
+            using var trayApp = new TrayApplication(monitor);
+            try
+            {
+                monitor.Start();
+                Application.Run();
+            }
+            finally
+            {
+                monitor.Stop();
+                monitor.Dispose();
+            }
         }
     }
 }

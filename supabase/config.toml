@@ -1,0 +1,6 @@
+project_id = "game-tracker"
+
+[functions.process-notifications]
+# The function checks for the service-role bearer token itself so queue processing
+# can be invoked by a Supabase schedule without exposing it to client JWTs.
+verify_jwt = false

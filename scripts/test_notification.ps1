@@ -1,13 +1,17 @@
 # Test script: send a test notification payload to the Edge Function or direct to notification_queue
 
 param(
-  [string]$SupabaseUrl = "https://your-project.supabase.co",
-  [string]$ServiceRole = "YOUR_SERVICE_ROLE_KEY",
+  [Parameter(Mandatory = $true)]
+  [ValidatePattern('^https://')]
+  [string]$SupabaseUrl,
+  [Parameter(Mandatory = $true)]
+  [string]$ServiceRole,
   [string]$EdgeFunctionUrl = "",
-  [string]$UserId = "REPLACE_WITH_USER_UUID"
+  [Parameter(Mandatory = $true)]
+  [guid]$UserId
 )
 
-$payload = @{ user_id = $UserId; status = "playing"; current_game = "Test Game"; started_at = (Get-Date).ToString("o") } | ConvertTo-Json
+$payload = @{ payload = @{ user_id = $UserId; status = "playing"; current_game = "Test Game"; started_at = (Get-Date).ToUniversalTime().ToString("o") } } | ConvertTo-Json -Depth 3
 
 if ($EdgeFunctionUrl -ne "") {
   Write-Host "Posting to Edge Function: $EdgeFunctionUrl"
